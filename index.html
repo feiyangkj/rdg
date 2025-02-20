@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>A3333333333 网页 - 收藏</title>
+  <title>A 网页 - 收藏</title>
   <style>
     body {
       margin: 0;
@@ -36,7 +36,7 @@
     }
     .site-card {
       width: 120px;
-      height: 120px;
+      height: 140px; /* 高度稍微增加，以容纳删除按钮 */
       background-color: #f1f1f1;
       border-radius: 8px;
       display: flex;
@@ -46,6 +46,7 @@
       text-align: center;
       cursor: grab;
       transition: box-shadow 0.2s;
+      position: relative; /* 方便定位删除按钮 */
     }
     .site-card:hover {
       box-shadow: 0 0 8px rgba(0,0,0,0.2);
@@ -60,6 +61,18 @@
       font-size: 0.8rem;
       color: #333;
       word-break: break-all;
+    }
+    /* 删除按钮样式 */
+    .delete-btn {
+      position: absolute;
+      bottom: 6px;
+      background-color: #f44336;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.8rem;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -104,6 +117,18 @@
         const nameSpan = document.createElement('span');
         nameSpan.textContent = site.title || site.domain || '未命名';
 
+        // 删除按钮
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = '删除';
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation(); // 防止触发卡片点击跳转
+          // 从数组中移除
+          sites.splice(index, 1);
+          saveSites();
+          renderSites();
+        });
+
         // 点击卡片跳转
         card.addEventListener('click', () => {
           window.open(site.url, '_blank');
@@ -114,8 +139,10 @@
           e.dataTransfer.setData('text/plain', index);
         });
 
+        // 将元素放入卡片并渲染
         card.appendChild(img);
         card.appendChild(nameSpan);
+        card.appendChild(deleteBtn);
         sitesContainer.appendChild(card);
       });
     }
