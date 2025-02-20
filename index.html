@@ -16,6 +16,7 @@
       text-align: center;
       position: relative;
     }
+    /* 批量删除按钮（右上角） */
     .delete-selected-btn {
       position: absolute;
       right: 1rem;
@@ -58,7 +59,7 @@
       justify-content: center;
       align-items: center;
       text-align: center;
-      cursor: grab;
+      cursor: grab; /* 表示可拖拽 */
       transition: box-shadow 0.2s;
       position: relative;
     }
@@ -81,22 +82,31 @@
       border: 2px solid #2196F3;
       background-color: #e3f2fd;
     }
-    /* 选中对勾标记 */
-    .checkmark {
+    /* 左上角的“圆形选择区域” */
+    .select-circle {
       position: absolute;
-      top: 5px;
-      left: 5px;
-      width: 20px;
-      height: 20px;
+      top: 6px;
+      left: 6px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
-      background-color: #2196F3;
+      background-color: rgba(0, 0, 0, 0.2); /* 灰色半透明 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    /* 对勾图标 */
+    .checkmark {
       color: #fff;
       font-size: 16px;
-      line-height: 20px;
-      text-align: center;
-      display: none; /* 默认隐藏，只有 selected 时才显示 */
+      display: none; /* 未选中时隐藏 */
     }
-    .site-card.selected .checkmark {
+    /* 选中后：背景变蓝色，显示对勾 */
+    .site-card.selected .select-circle {
+      background-color: #2196F3;
+    }
+    .site-card.selected .select-circle .checkmark {
       display: block;
     }
   </style>
@@ -104,7 +114,6 @@
 <body>
   <header>
     <h1>A 网页 - 收藏</h1>
-    <!-- 批量删除按钮（右上角） -->
     <button id="delete-selected-btn" class="delete-selected-btn">删除所选</button>
   </header>
 
@@ -122,7 +131,7 @@
     // ===== 全局数据：存储网站信息 =====
     let sites = JSON.parse(localStorage.getItem('mySites')) || [];
 
-    // 已选中的卡片索引集合（用Set来存储索引，便于增删）
+    // 已选中的卡片索引集合（用 Set 来存储索引，便于增删）
     let selectedIndices = new Set();
 
     const sitesContainer = document.getElementById('sites-container');
@@ -140,7 +149,7 @@
         card.className = 'site-card';
         card.draggable = true; // 启用拖拽
 
-        // 如果该索引在 selectedIndices 中，给它加个类
+        // 如果该索引在 selectedIndices 中，则加类 selected
         if (selectedIndices.has(index)) {
           card.classList.add('selected');
         }
@@ -153,78 +162,39 @@
         const nameSpan = document.createElement('span');
         nameSpan.textContent = site.title || site.domain || '未命名';
 
-        // 对勾标记
+        // 左上角圆形选择区域
+        const selectCircle = document.createElement('div');
+        selectCircle.className = 'select-circle';
+        // 对勾
         const checkmark = document.createElement('div');
         checkmark.className = 'checkmark';
         checkmark.textContent = '✓';
+        selectCircle.appendChild(checkmark);
 
-        // ====== 鼠标/手指事件处理：区分短按(点击)和长按 ======
-        let pressTimer = null;
-        let longPressTriggered = false;
-        const pressThreshold = 500; // 毫秒，长按阈值
+        // 点击“选择区域” => 切换选中状态
+        selectCircle.addEventListener('click', (e) => {
+          e.stopPropagation(); // 防止触发卡片本身的点击
+          toggleSelection(index);
+        });
 
-        // 开始按下
-        function onPressStart(e) {
-          // 如果用户要拖拽，这时就先清除定时器
-          // 但是我们得先设置一个定时器，然后如果没动，就算长按
-          longPressTriggered = false;
-          pressTimer = setTimeout(() => {
-            // 触发长按
-            longPressTriggered = true;
-            toggleSelection(index);
-          }, pressThreshold);
-        }
+        // 点击卡片其他区域 => 打开链接
+        card.addEventListener('click', () => {
+          window.open(site.url, '_blank');
+        });
 
-        // 松开/离开
-        function onPressEnd(e) {
-          if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-          }
-          // 如果没有触发长按，就算短按 => 打开链接
-          if (!longPressTriggered) {
-            window.open(site.url, '_blank');
-          }
-        }
-
-        // 如果开始拖拽了，就取消长按定时器
+        // 拖拽开始
         card.addEventListener('dragstart', (e) => {
-          if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-          }
-        });
-
-        // PC鼠标事件
-        card.addEventListener('mousedown', onPressStart);
-        card.addEventListener('mouseup', onPressEnd);
-        card.addEventListener('mouseleave', () => {
-          if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-          }
-        });
-
-        // 移动端触摸事件
-        card.addEventListener('touchstart', onPressStart);
-        card.addEventListener('touchend', onPressEnd);
-        card.addEventListener('touchmove', () => {
-          if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-          }
-        });
-        card.addEventListener('touchcancel', () => {
-          if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-          }
+          e.dataTransfer.setData('text/plain', index);
+          // 若此卡片已在选中集合里，拖拽后索引会变，需要重新计算
+          // 这里简化处理：拖拽时先清空选中
+          selectedIndices.clear();
+          renderSites();
         });
 
         // 将元素放入卡片并渲染
+        card.appendChild(selectCircle);
         card.appendChild(img);
         card.appendChild(nameSpan);
-        card.appendChild(checkmark);
         sitesContainer.appendChild(card);
       });
 
@@ -249,10 +219,6 @@
       const draggedItem = sites[draggedIndex];
       sites.splice(draggedIndex, 1);
       sites.splice(targetIndex, 0, draggedItem);
-
-      // 如果被拖拽/移动的卡片在选中集合里，也需要更新它的索引
-      // 最简单的做法：拖拽后清空所有选中（也可以重新计算选中索引）
-      selectedIndices.clear();
 
       saveSites();
       renderSites();
@@ -290,14 +256,14 @@
       renderSites();
     });
 
-    // ===== 长按后，切换“选中”状态 =====
+    // ===== 切换选中状态 =====
     function toggleSelection(index) {
       if (selectedIndices.has(index)) {
         selectedIndices.delete(index);
       } else {
         selectedIndices.add(index);
       }
-      renderSites(); // 重新渲染，更新样式
+      renderSites(); // 重新渲染
     }
 
     // ===== 根据 selectedIndices 显示或隐藏“删除所选”按钮 =====
