@@ -2,8 +2,9 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>A1111111111111111111111111111111111111111111111111111 网页</title>
+  <title>A22222222 网页 - 收藏</title>
   <style>
+    /* ========== 基本样式 ========== */
     body {
       margin: 0;
       font-family: sans-serif;
@@ -25,6 +26,12 @@
       padding: 0.5rem;
       margin-right: 0.5rem;
     }
+    .add-site-form button {
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+
+    /* ========== 卡片展示区 ========== */
     .sites-container {
       display: flex;
       flex-wrap: wrap;
@@ -41,6 +48,10 @@
       align-items: center;
       text-align: center;
       cursor: grab;
+      transition: box-shadow 0.2s;
+    }
+    .site-card:hover {
+      box-shadow: 0 0 8px rgba(0,0,0,0.2);
     }
     .site-card img {
       width: 48px;
@@ -51,39 +62,41 @@
       margin-top: 0.5rem;
       font-size: 0.8rem;
       color: #333;
+      word-break: break-all;
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>A 网页 - 我的收藏</h1>
+    <h1>A 网页 - 收藏</h1>
   </header>
 
   <div class="container">
     <!-- 添加网站表单 -->
     <div class="add-site-form">
-      <input type="text" id="site-url" placeholder="输入网站URL，例如：https://www.google.com">
+      <input type="text" id="site-url" placeholder="输入网址，例如：https://www.google.com" />
       <button id="add-site-btn">添加网站</button>
     </div>
+
     <!-- 展示网站卡片的容器 -->
     <div id="sites-container" class="sites-container"></div>
   </div>
 
   <script>
-    // 全局数组，用于存储网站信息
+    // ========== 全局数据：存储网站信息 ==========
     let sites = JSON.parse(localStorage.getItem('mySites')) || [];
 
+    // 获取DOM引用
     const sitesContainer = document.getElementById('sites-container');
     const addSiteBtn = document.getElementById('add-site-btn');
     const siteUrlInput = document.getElementById('site-url');
 
-    // -----------------------
-    // 1. 渲染函数
-    // -----------------------
+    // ========== 1. 渲染函数 ==========
     function renderSites() {
       sitesContainer.innerHTML = ''; // 先清空容器
 
       sites.forEach((site, index) => {
+        // 创建卡片
         const card = document.createElement('div');
         card.className = 'site-card';
         card.draggable = true; // 启用拖拽
@@ -106,15 +119,14 @@
           e.dataTransfer.setData('text/plain', index);
         });
 
+        // 将元素放入卡片并渲染
         card.appendChild(img);
         card.appendChild(nameSpan);
         sitesContainer.appendChild(card);
       });
     }
 
-    // -----------------------
-    // 2. 拖拽排序事件
-    // -----------------------
+    // ========== 2. 拖拽排序事件 ==========
     sitesContainer.addEventListener('dragover', (e) => {
       e.preventDefault(); // 允许放置
     });
@@ -136,13 +148,13 @@
       renderSites();
     });
 
-    // -----------------------
-    // 3. 添加网站按钮事件
-    // -----------------------
+    // ========== 3. 添加网站按钮事件 ==========
     addSiteBtn.addEventListener('click', async () => {
       const url = siteUrlInput.value.trim();
-      if (!url) return;
-
+      if (!url) {
+        alert('请输入网站 URL');
+        return;
+      }
       // 获取网站信息
       const siteData = await fetchSiteData(url);
       sites.push(siteData);
@@ -151,21 +163,22 @@
       siteUrlInput.value = '';
     });
 
-    // -----------------------
-    // 4. 获取网站信息（favicon/title）
-    // -----------------------
+    // ========== 4. 获取网站信息（favicon/title）==========
     async function fetchSiteData(url) {
       try {
+        // 提取域名
         const domain = new URL(url).hostname;
+        // 通过 Google Favicon 服务获取图标
         const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+        // 简化处理标题，直接用域名做标题
         return {
           url,
           domain,
           faviconUrl,
-          title: domain // 简化：用域名代替标题
+          title: domain 
         };
       } catch (e) {
-        // URL 不合法则返回默认值
+        // 如果URL不合法，返回默认信息
         return {
           url,
           domain: url,
@@ -175,16 +188,13 @@
       }
     }
 
-    // -----------------------
-    // 5. 保存到 localStorage
-    // -----------------------
+    // ========== 5. 保存到 localStorage ==========
     function saveSites() {
       localStorage.setItem('mySites', JSON.stringify(sites));
     }
 
-    // -----------------------
-    // 6. 处理 URL 参数自动添加
-    //    (用于 Bookmarklet 功能)
-    // -----------------------
-    function autoAddByUrlParams() {
-      const params = n
+    // ========== 6. 初始化渲染 ==========
+    renderSites();
+  </script>
+</body>
+</html>
