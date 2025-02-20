@@ -7,12 +7,26 @@
     body {
       margin: 0;
       font-family: sans-serif;
+      position: relative;
     }
     header {
       background: #333;
       color: #fff;
       padding: 1rem;
       text-align: center;
+      position: relative;
+    }
+    .delete-selected-btn {
+      position: absolute;
+      right: 1rem;
+      top: 1rem;
+      padding: 0.5rem 1rem;
+      background-color: #f44336;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      display: none; /* 默认隐藏 */
     }
     .container {
       padding: 1rem;
@@ -36,7 +50,7 @@
     }
     .site-card {
       width: 120px;
-      height: 140px; /* 高度稍微增加，以容纳删除按钮 */
+      height: 120px;
       background-color: #f1f1f1;
       border-radius: 8px;
       display: flex;
@@ -46,7 +60,7 @@
       text-align: center;
       cursor: grab;
       transition: box-shadow 0.2s;
-      position: relative; /* 方便定位删除按钮 */
+      position: relative;
     }
     .site-card:hover {
       box-shadow: 0 0 8px rgba(0,0,0,0.2);
@@ -62,23 +76,36 @@
       color: #333;
       word-break: break-all;
     }
-    /* 删除按钮样式 */
-    .delete-btn {
+    /* 已选中的卡片边框/背景高亮 */
+    .site-card.selected {
+      border: 2px solid #2196F3;
+      background-color: #e3f2fd;
+    }
+    /* 选中对勾标记 */
+    .checkmark {
       position: absolute;
-      bottom: 6px;
-      background-color: #f44336;
+      top: 5px;
+      left: 5px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: #2196F3;
       color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 0.3rem 0.6rem;
-      font-size: 0.8rem;
-      cursor: pointer;
+      font-size: 16px;
+      line-height: 20px;
+      text-align: center;
+      display: none; /* 默认隐藏，只有 selected 时才显示 */
+    }
+    .site-card.selected .checkmark {
+      display: block;
     }
   </style>
 </head>
 <body>
   <header>
     <h1>A 网页 - 收藏</h1>
+    <!-- 批量删除按钮（右上角） -->
+    <button id="delete-selected-btn" class="delete-selected-btn">删除所选</button>
   </header>
 
   <div class="container">
@@ -95,9 +122,13 @@
     // ===== 全局数据：存储网站信息 =====
     let sites = JSON.parse(localStorage.getItem('mySites')) || [];
 
+    // 已选中的卡片索引集合（用Set来存储索引，便于增删）
+    let selectedIndices = new Set();
+
     const sitesContainer = document.getElementById('sites-container');
     const addSiteBtn = document.getElementById('add-site-btn');
     const siteUrlInput = document.getElementById('site-url');
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
 
     // ===== 1. 渲染函数 =====
     function renderSites() {
@@ -109,6 +140,11 @@
         card.className = 'site-card';
         card.draggable = true; // 启用拖拽
 
+        // 如果该索引在 selectedIndices 中，给它加个类
+        if (selectedIndices.has(index)) {
+          card.classList.add('selected');
+        }
+
         // LOGO 图片
         const img = document.createElement('img');
         img.src = site.faviconUrl || 'https://via.placeholder.com/48';
@@ -117,34 +153,83 @@
         const nameSpan = document.createElement('span');
         nameSpan.textContent = site.title || site.domain || '未命名';
 
-        // 删除按钮
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-btn';
-        deleteBtn.textContent = '删除';
-        deleteBtn.addEventListener('click', (e) => {
-          e.stopPropagation(); // 防止触发卡片点击跳转
-          // 从数组中移除
-          sites.splice(index, 1);
-          saveSites();
-          renderSites();
-        });
+        // 对勾标记
+        const checkmark = document.createElement('div');
+        checkmark.className = 'checkmark';
+        checkmark.textContent = '✓';
 
-        // 点击卡片跳转
-        card.addEventListener('click', () => {
-          window.open(site.url, '_blank');
-        });
+        // ====== 鼠标/手指事件处理：区分短按(点击)和长按 ======
+        let pressTimer = null;
+        let longPressTriggered = false;
+        const pressThreshold = 500; // 毫秒，长按阈值
 
-        // 拖拽开始
+        // 开始按下
+        function onPressStart(e) {
+          // 如果用户要拖拽，这时就先清除定时器
+          // 但是我们得先设置一个定时器，然后如果没动，就算长按
+          longPressTriggered = false;
+          pressTimer = setTimeout(() => {
+            // 触发长按
+            longPressTriggered = true;
+            toggleSelection(index);
+          }, pressThreshold);
+        }
+
+        // 松开/离开
+        function onPressEnd(e) {
+          if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+          }
+          // 如果没有触发长按，就算短按 => 打开链接
+          if (!longPressTriggered) {
+            window.open(site.url, '_blank');
+          }
+        }
+
+        // 如果开始拖拽了，就取消长按定时器
         card.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', index);
+          if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+          }
+        });
+
+        // PC鼠标事件
+        card.addEventListener('mousedown', onPressStart);
+        card.addEventListener('mouseup', onPressEnd);
+        card.addEventListener('mouseleave', () => {
+          if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+          }
+        });
+
+        // 移动端触摸事件
+        card.addEventListener('touchstart', onPressStart);
+        card.addEventListener('touchend', onPressEnd);
+        card.addEventListener('touchmove', () => {
+          if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+          }
+        });
+        card.addEventListener('touchcancel', () => {
+          if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+          }
         });
 
         // 将元素放入卡片并渲染
         card.appendChild(img);
         card.appendChild(nameSpan);
-        card.appendChild(deleteBtn);
+        card.appendChild(checkmark);
         sitesContainer.appendChild(card);
       });
+
+      // 渲染完毕后，检查是否需要显示“删除所选”按钮
+      updateDeleteButtonVisibility();
     }
 
     // ===== 2. 拖拽排序事件 =====
@@ -164,6 +249,10 @@
       const draggedItem = sites[draggedIndex];
       sites.splice(draggedIndex, 1);
       sites.splice(targetIndex, 0, draggedItem);
+
+      // 如果被拖拽/移动的卡片在选中集合里，也需要更新它的索引
+      // 最简单的做法：拖拽后清空所有选中（也可以重新计算选中索引）
+      selectedIndices.clear();
 
       saveSites();
       renderSites();
@@ -187,9 +276,41 @@
       siteUrlInput.value = '';
     });
 
+    // ===== 批量删除选中 =====
+    deleteSelectedBtn.addEventListener('click', () => {
+      if (selectedIndices.size === 0) return;
+
+      // 按索引从大到小删除，避免删除后后面索引错位
+      const indicesArray = Array.from(selectedIndices).sort((a,b)=>b-a);
+      indicesArray.forEach(idx => {
+        sites.splice(idx, 1);
+      });
+      selectedIndices.clear();
+      saveSites();
+      renderSites();
+    });
+
+    // ===== 长按后，切换“选中”状态 =====
+    function toggleSelection(index) {
+      if (selectedIndices.has(index)) {
+        selectedIndices.delete(index);
+      } else {
+        selectedIndices.add(index);
+      }
+      renderSites(); // 重新渲染，更新样式
+    }
+
+    // ===== 根据 selectedIndices 显示或隐藏“删除所选”按钮 =====
+    function updateDeleteButtonVisibility() {
+      if (selectedIndices.size > 0) {
+        deleteSelectedBtn.style.display = 'inline-block';
+      } else {
+        deleteSelectedBtn.style.display = 'none';
+      }
+    }
+
     // 自动补全协议前缀
     function normalizeUrl(url) {
-      // 如果不是以 http:// 或 https:// 开头，就加上 https://
       if (!/^https?:\/\//i.test(url)) {
         url = 'https://' + url;
       }
