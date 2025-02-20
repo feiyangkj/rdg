@@ -74,4 +74,247 @@
       transition: box-shadow 0.2s;
       position: relative;
     }
-    .site-card:hover
+    .site-card:hover {
+      box-shadow: 0 0 8px rgba(0,0,0,0.2);
+    }
+    .site-card img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+    .site-card span {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #333;
+      word-break: break-all;
+    }
+    /* 选中高亮 */
+    .site-card.selected {
+      border: 2px solid #2196F3;
+      background-color: #e3f2fd;
+    }
+    /* 选择圆圈：更小，18x18 */
+    .select-circle {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background-color: rgba(0, 0, 0, 0.2); /* 灰色半透明 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .checkmark {
+      color: #fff;
+      font-size: 14px;
+      display: none; /* 未选中时隐藏 */
+    }
+    .site-card.selected .select-circle {
+      background-color: #2196F3;
+    }
+    .site-card.selected .select-circle .checkmark {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <!-- 页头 -->
+  <header>
+    <h1>RDG</h1>
+    <!-- 批量删除按钮（右上） -->
+    <button id="delete-selected-btn" class="delete-selected-btn">删除所选</button>
+  </header>
+
+  <div class="container">
+    <!-- 添加网站表单 -->
+    <div class="add-site-form">
+      <input type="text" id="site-url" placeholder="输入网址，如：google.com 或 https://www.google.com" />
+      <button id="add-site-btn">添加网站</button>
+    </div>
+
+    <!-- 展示网站卡片的容器 -->
+    <div id="sites-container" class="sites-container"></div>
+  </div>
+
+  <script>
+    // ======== 全局数据 ========
+    let sites = JSON.parse(localStorage.getItem('mySites')) || [];
+    let selectedIndices = new Set(); // 存储被选中的卡片索引
+
+    // DOM 引用
+    const sitesContainer = document.getElementById('sites-container');
+    const addSiteBtn = document.getElementById('add-site-btn');
+    const siteUrlInput = document.getElementById('site-url');
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+
+    // ========== 1. 渲染卡片 ==========
+    function renderSites() {
+      sitesContainer.innerHTML = ''; // 清空容器
+
+      sites.forEach((site, index) => {
+        // 创建卡片
+        const card = document.createElement('div');
+        card.className = 'site-card';
+        card.draggable = true; // 启用拖拽
+
+        // 若索引在 selectedIndices 中，则加 selected 类
+        if (selectedIndices.has(index)) {
+          card.classList.add('selected');
+        }
+
+        // 左上角选择圆圈
+        const selectCircle = document.createElement('div');
+        selectCircle.className = 'select-circle';
+        const checkmark = document.createElement('div');
+        checkmark.className = 'checkmark';
+        checkmark.textContent = '✓';
+        selectCircle.appendChild(checkmark);
+
+        // 点击圆圈 => 切换选中
+        selectCircle.addEventListener('click', (e) => {
+          e.stopPropagation(); // 不触发卡片点击
+          toggleSelection(index);
+        });
+
+        // LOGO
+        const img = document.createElement('img');
+        img.src = site.faviconUrl || 'https://via.placeholder.com/48';
+
+        // 名称
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = site.title || site.domain || '未命名';
+
+        // 点击卡片其他区域 => 在本页跳转到网站
+        card.addEventListener('click', (e) => {
+          if (e.target === selectCircle || selectCircle.contains(e.target)) {
+            return; // 如果点击的是选择圆圈，不跳转
+          }
+          // 在同一个标签打开
+          window.location.href = site.url;
+        });
+
+        // 拖拽开始
+        card.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', index);
+          // 为避免索引混乱，拖拽时清空选中
+          selectedIndices.clear();
+          renderSites();
+        });
+
+        // 组装
+        card.appendChild(selectCircle);
+        card.appendChild(img);
+        card.appendChild(nameSpan);
+        sitesContainer.appendChild(card);
+      });
+
+      // 检查是否显示“删除所选”按钮
+      updateDeleteButtonVisibility();
+    }
+
+    // ========== 2. 拖拽排序事件 ==========
+    sitesContainer.addEventListener('dragover', (e) => {
+      e.preventDefault(); // 允许放置
+    });
+    sitesContainer.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const draggedIndex = e.dataTransfer.getData('text/plain');
+      const target = e.target.closest('.site-card');
+      if (!target) return;
+      const targetIndex = Array.from(sitesContainer.children).indexOf(target);
+      if (targetIndex < 0 || targetIndex == draggedIndex) return;
+
+      // 重新排序
+      const draggedItem = sites[draggedIndex];
+      sites.splice(draggedIndex, 1);
+      sites.splice(targetIndex, 0, draggedItem);
+
+      saveSites();
+      renderSites();
+    });
+
+    // ========== 3. 添加网站 ==========
+    addSiteBtn.addEventListener('click', async () => {
+      let inputUrl = siteUrlInput.value.trim();
+      if (!inputUrl) {
+        alert('请输入网站地址！');
+        return;
+      }
+      inputUrl = normalizeUrl(inputUrl);
+      const siteData = await fetchSiteData(inputUrl);
+      sites.push(siteData);
+      saveSites();
+      renderSites();
+      siteUrlInput.value = '';
+    });
+
+    // ========== 4. 批量删除选中 ==========
+    deleteSelectedBtn.addEventListener('click', () => {
+      if (selectedIndices.size === 0) return;
+      // 从大到小删除，避免索引错位
+      const indicesArray = Array.from(selectedIndices).sort((a,b) => b-a);
+      indicesArray.forEach(idx => {
+        sites.splice(idx, 1);
+      });
+      selectedIndices.clear();
+      saveSites();
+      renderSites();
+    });
+
+    // ========== 切换选中状态 ==========
+    function toggleSelection(index) {
+      if (selectedIndices.has(index)) {
+        selectedIndices.delete(index);
+      } else {
+        selectedIndices.add(index);
+      }
+      renderSites();
+    }
+
+    // ========== 显示/隐藏“删除所选”按钮 ==========
+    function updateDeleteButtonVisibility() {
+      if (selectedIndices.size > 0) {
+        deleteSelectedBtn.style.display = 'inline-block';
+      } else {
+        deleteSelectedBtn.style.display = 'none';
+      }
+    }
+
+    // ========== 补全URL协议 ==========
+    function normalizeUrl(url) {
+      if (!/^https?:\/\//i.test(url)) {
+        url = 'https://' + url;
+      }
+      return url;
+    }
+
+    // ========== 获取网站信息（favicon/title）==========
+    async function fetchSiteData(url) {
+      try {
+        const domain = new URL(url).hostname;
+        const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+        return { url, domain, faviconUrl, title: domain };
+      } catch (e) {
+        // 如果URL不合法
+        return {
+          url,
+          domain: url,
+          faviconUrl: 'https://via.placeholder.com/48',
+          title: url
+        };
+      }
+    }
+
+    // ========== 保存到 localStorage ==========
+    function saveSites() {
+      localStorage.setItem('mySites', JSON.stringify(sites));
+    }
+
+    // ========== 页面初始化 ==========
+    renderSites();
+  </script>
+</body>
+</html>
