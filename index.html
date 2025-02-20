@@ -2,12 +2,19 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>A 网页 - 收藏</title>
+  <title>RDG</title>
   <style>
+    /* ======== 全局样式 ======== */
+    * {
+      box-sizing: border-box;
+    }
     body {
       margin: 0;
       font-family: sans-serif;
       position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     header {
       background: #333;
@@ -16,22 +23,44 @@
       text-align: center;
       position: relative;
     }
-    /* 批量删除按钮（右上角） */
-    .delete-selected-btn {
+    header h1 {
+      margin: 0;
+    }
+    /* ======== 导航按钮通用样式 ======== */
+    .nav-button {
       position: absolute;
-      right: 1rem;
       top: 1rem;
       padding: 0.5rem 1rem;
-      background-color: #f44336;
-      color: #fff;
       border: none;
       border-radius: 4px;
       cursor: pointer;
+    }
+    /* 返回按钮：左侧 */
+    #return-btn {
+      left: 1rem;
+      background-color: #607d8b; /* 灰蓝 */
+      color: #fff;
       display: none; /* 默认隐藏 */
     }
+    /* 删除所选按钮：右侧 */
+    #delete-selected-btn {
+      right: 1rem;
+      background-color: #f44336;
+      color: #fff;
+      display: none; /* 默认隐藏 */
+    }
+
+    /* ======== 容器布局 ======== */
     .container {
       padding: 1rem;
+      flex: 1; /* 主体区域撑开 */
+      overflow: auto; /* 如果内容过多可滚动 */
     }
+
+    /* ======== 主页视图（home-view） ======== */
+    #home-view {}
+
+    /* 添加网站表单 */
     .add-site-form {
       margin-bottom: 1rem;
     }
@@ -44,11 +73,14 @@
       padding: 0.5rem 1rem;
       cursor: pointer;
     }
+
+    /* 卡片容器 */
     .sites-container {
       display: flex;
       flex-wrap: wrap;
       gap: 1rem;
     }
+    /* 卡片样式 */
     .site-card {
       width: 120px;
       height: 120px;
@@ -77,18 +109,18 @@
       color: #333;
       word-break: break-all;
     }
-    /* 已选中的卡片边框/背景高亮 */
+    /* 选中高亮 */
     .site-card.selected {
       border: 2px solid #2196F3;
       background-color: #e3f2fd;
     }
-    /* 左上角的“圆形选择区域” */
+    /* 选择圆圈：更小，18x18 */
     .select-circle {
       position: absolute;
       top: 6px;
       left: 6px;
-      width: 24px;
-      height: 24px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
       background-color: rgba(0, 0, 0, 0.2); /* 灰色半透明 */
       display: flex;
@@ -96,52 +128,73 @@
       justify-content: center;
       cursor: pointer;
     }
-    /* 对勾图标 */
     .checkmark {
       color: #fff;
-      font-size: 16px;
+      font-size: 14px;
       display: none; /* 未选中时隐藏 */
     }
-    /* 选中后：背景变蓝色，显示对勾 */
     .site-card.selected .select-circle {
       background-color: #2196F3;
     }
     .site-card.selected .select-circle .checkmark {
       display: block;
     }
+
+    /* ======== iframe 视图（iframe-view） ======== */
+    #iframe-view {
+      display: none; /* 默认隐藏 */
+      width: 100%;
+      height: 100%;
+    }
+    #external-iframe {
+      width: 100%;
+      height: calc(100vh - 80px); /* 减去header高度大约80px */
+      border: none;
+    }
   </style>
 </head>
 <body>
+  <!-- 页头 -->
   <header>
-    <h1>A 网页 - 收藏</h1>
-    <button id="delete-selected-btn" class="delete-selected-btn">删除所选</button>
+    <h1>RDG</h1>
+    <!-- 返回按钮（左上） -->
+    <button id="return-btn" class="nav-button">返回</button>
+    <!-- 批量删除按钮（右上） -->
+    <button id="delete-selected-btn" class="nav-button">删除所选</button>
   </header>
 
-  <div class="container">
-    <!-- 添加网站表单 -->
+  <!-- 主页视图 -->
+  <div id="home-view" class="container">
     <div class="add-site-form">
       <input type="text" id="site-url" placeholder="输入网址，如：google.com 或 https://www.google.com" />
       <button id="add-site-btn">添加网站</button>
     </div>
-    <!-- 展示网站卡片的容器 -->
     <div id="sites-container" class="sites-container"></div>
   </div>
 
+  <!-- iframe视图 -->
+  <div id="iframe-view" class="container">
+    <iframe id="external-iframe"></iframe>
+  </div>
+
   <script>
-    // ===== 全局数据：存储网站信息 =====
+    // ======== 全局数据 ========
     let sites = JSON.parse(localStorage.getItem('mySites')) || [];
+    let selectedIndices = new Set(); // 存储被选中的卡片索引
 
-    // 已选中的卡片索引集合（用 Set 来存储索引，便于增删）
-    let selectedIndices = new Set();
-
+    // DOM 引用
+    const homeView = document.getElementById('home-view');
+    const iframeView = document.getElementById('iframe-view');
+    const externalIframe = document.getElementById('external-iframe');
     const sitesContainer = document.getElementById('sites-container');
     const addSiteBtn = document.getElementById('add-site-btn');
     const siteUrlInput = document.getElementById('site-url');
     const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    const returnBtn = document.getElementById('return-btn');
 
-    // ===== 1. 渲染函数 =====
+    // ========== 1. 渲染主页卡片 ==========
     function renderSites() {
-      sitesContainer.innerHTML = ''; // 先清空容器
+      sitesContainer.innerHTML = ''; // 清空容器
 
       sites.forEach((site, index) => {
         // 创建卡片
@@ -149,64 +202,65 @@
         card.className = 'site-card';
         card.draggable = true; // 启用拖拽
 
-        // 如果该索引在 selectedIndices 中，则加类 selected
+        // 若索引在 selectedIndices 中，则加 selected 类
         if (selectedIndices.has(index)) {
           card.classList.add('selected');
         }
 
-        // LOGO 图片
-        const img = document.createElement('img');
-        img.src = site.faviconUrl || 'https://via.placeholder.com/48';
-
-        // 网站名称
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = site.title || site.domain || '未命名';
-
-        // 左上角圆形选择区域
+        // 左上角选择圆圈
         const selectCircle = document.createElement('div');
         selectCircle.className = 'select-circle';
-        // 对勾
         const checkmark = document.createElement('div');
         checkmark.className = 'checkmark';
         checkmark.textContent = '✓';
         selectCircle.appendChild(checkmark);
 
-        // 点击“选择区域” => 切换选中状态
+        // 点击圆圈 => 切换选中
         selectCircle.addEventListener('click', (e) => {
-          e.stopPropagation(); // 防止触发卡片本身的点击
+          e.stopPropagation(); // 不触发卡片点击
           toggleSelection(index);
         });
 
-        // 点击卡片其他区域 => 打开链接
-        card.addEventListener('click', () => {
-          window.open(site.url, '_blank');
+        // LOGO
+        const img = document.createElement('img');
+        img.src = site.faviconUrl || 'https://via.placeholder.com/48';
+
+        // 名称
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = site.title || site.domain || '未命名';
+
+        // 点击卡片其他区域 => 在 iframe 中打开网站
+        card.addEventListener('click', (e) => {
+          // 如果点击的目标是selectCircle，不执行跳转
+          if (e.target === selectCircle || selectCircle.contains(e.target)) {
+            return;
+          }
+          switchToIframeView(site.url);
         });
 
         // 拖拽开始
         card.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', index);
-          // 若此卡片已在选中集合里，拖拽后索引会变，需要重新计算
-          // 这里简化处理：拖拽时先清空选中
+          // 为避免索引混乱，拖拽时清空选中
           selectedIndices.clear();
           renderSites();
         });
 
-        // 将元素放入卡片并渲染
+        // 组装
         card.appendChild(selectCircle);
         card.appendChild(img);
         card.appendChild(nameSpan);
         sitesContainer.appendChild(card);
       });
 
-      // 渲染完毕后，检查是否需要显示“删除所选”按钮
+      // 检查是否显示“删除所选”按钮
       updateDeleteButtonVisibility();
     }
 
-    // ===== 2. 拖拽排序事件 =====
+    // ========== 2. 拖拽排序事件 ==========
     sitesContainer.addEventListener('dragover', (e) => {
       e.preventDefault(); // 允许放置
     });
-
     sitesContainer.addEventListener('drop', (e) => {
       e.preventDefault();
       const draggedIndex = e.dataTransfer.getData('text/plain');
@@ -224,17 +278,14 @@
       renderSites();
     });
 
-    // ===== 3. 添加网站按钮事件 =====
+    // ========== 3. 添加网站 ==========
     addSiteBtn.addEventListener('click', async () => {
       let inputUrl = siteUrlInput.value.trim();
       if (!inputUrl) {
         alert('请输入网站地址！');
         return;
       }
-
-      // 自动补全 http(s):// 前缀，防止 GitHub Pages 打开相对路径
       inputUrl = normalizeUrl(inputUrl);
-
       const siteData = await fetchSiteData(inputUrl);
       sites.push(siteData);
       saveSites();
@@ -242,12 +293,11 @@
       siteUrlInput.value = '';
     });
 
-    // ===== 批量删除选中 =====
+    // ========== 4. 批量删除选中 ==========
     deleteSelectedBtn.addEventListener('click', () => {
       if (selectedIndices.size === 0) return;
-
-      // 按索引从大到小删除，避免删除后后面索引错位
-      const indicesArray = Array.from(selectedIndices).sort((a,b)=>b-a);
+      // 从大到小删除，避免索引错位
+      const indicesArray = Array.from(selectedIndices).sort((a,b) => b-a);
       indicesArray.forEach(idx => {
         sites.splice(idx, 1);
       });
@@ -256,17 +306,22 @@
       renderSites();
     });
 
-    // ===== 切换选中状态 =====
+    // ========== 5. 返回按钮 ==========
+    returnBtn.addEventListener('click', () => {
+      switchToHomeView();
+    });
+
+    // ========== 切换选中状态 ==========
     function toggleSelection(index) {
       if (selectedIndices.has(index)) {
         selectedIndices.delete(index);
       } else {
         selectedIndices.add(index);
       }
-      renderSites(); // 重新渲染
+      renderSites();
     }
 
-    // ===== 根据 selectedIndices 显示或隐藏“删除所选”按钮 =====
+    // ========== 显示/隐藏“删除所选”按钮 ==========
     function updateDeleteButtonVisibility() {
       if (selectedIndices.size > 0) {
         deleteSelectedBtn.style.display = 'inline-block';
@@ -275,7 +330,26 @@
       }
     }
 
-    // 自动补全协议前缀
+    // ========== 切换到 iframe 模式 ==========
+    function switchToIframeView(url) {
+      homeView.style.display = 'none';
+      iframeView.style.display = 'block';
+      externalIframe.src = url;
+      returnBtn.style.display = 'inline-block';
+      // 隐藏删除按钮（iframe模式下没用）
+      deleteSelectedBtn.style.display = 'none';
+    }
+
+    // ========== 切换回主页模式 ==========
+    function switchToHomeView() {
+      homeView.style.display = 'block';
+      iframeView.style.display = 'none';
+      externalIframe.src = '';
+      returnBtn.style.display = 'none';
+      updateDeleteButtonVisibility(); // 判断是否显示“删除所选”
+    }
+
+    // ========== 补全URL协议 ==========
     function normalizeUrl(url) {
       if (!/^https?:\/\//i.test(url)) {
         url = 'https://' + url;
@@ -283,19 +357,14 @@
       return url;
     }
 
-    // ===== 4. 获取网站信息（favicon/title） =====
+    // ========== 获取网站信息（favicon/title）==========
     async function fetchSiteData(url) {
       try {
         const domain = new URL(url).hostname;
         const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
-        return {
-          url,
-          domain,
-          faviconUrl,
-          title: domain
-        };
+        return { url, domain, faviconUrl, title: domain };
       } catch (e) {
-        // 如果URL不合法，使用默认
+        // 如果URL不合法
         return {
           url,
           domain: url,
@@ -305,12 +374,12 @@
       }
     }
 
-    // ===== 5. 保存到 localStorage =====
+    // ========== 保存到 localStorage ==========
     function saveSites() {
       localStorage.setItem('mySites', JSON.stringify(sites));
     }
 
-    // ===== 6. 初始化渲染 =====
+    // ========== 页面初始化 ==========
     renderSites();
   </script>
 </body>
