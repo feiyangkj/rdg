@@ -2,9 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>RDG</title>
+  <title>RDG - 拖拽排序</title>
   <style>
-    /* ===== 全局样式 ===== */
     body {
       margin: 0;
       font-family: sans-serif;
@@ -42,6 +41,8 @@
       flex: 1;
       overflow: auto;
     }
+
+    /* 添加网站表单 */
     .add-site-form {
       margin-bottom: 1rem;
     }
@@ -55,7 +56,7 @@
       cursor: pointer;
     }
 
-    /* 卡片容器 */
+    /* 卡片容器（用ul更方便SortabledJS） */
     .sites-container {
       display: flex;
       flex-wrap: wrap;
@@ -64,7 +65,8 @@
       margin: 0;
       padding: 0;
     }
-    /* 将每个卡片用 li 包裹更符合 SortableJS 的惯例，但 div 也可以 */
+
+    /* 卡片样式 */
     .site-card {
       width: 120px;
       height: 120px;
@@ -77,7 +79,7 @@
       text-align: center;
       transition: box-shadow 0.2s;
       position: relative;
-      cursor: pointer; /* 用 SortableJS，就不必使用 draggable="true" */
+      cursor: pointer; /* SortableJS会处理拖拽 */
     }
     .site-card:hover {
       box-shadow: 0 0 8px rgba(0,0,0,0.2);
@@ -93,12 +95,13 @@
       color: #333;
       word-break: break-all;
     }
+
     /* 选中高亮 */
     .site-card.selected {
       border: 2px solid #2196F3;
       background-color: #e3f2fd;
     }
-    /* 左上角的小圆圈(18x18) */
+    /* 左上角选择圆圈：18x18 */
     .select-circle {
       position: absolute;
       top: 6px;
@@ -110,7 +113,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
     }
     .checkmark {
       color: #fff;
@@ -128,7 +130,7 @@
 <body>
   <!-- 页头 -->
   <header>
-    <h1>RDG</h1>
+    <h1>RDG - 拖拽排序</h1>
     <button id="delete-selected-btn">删除所选</button>
   </header>
 
@@ -139,13 +141,14 @@
       <button id="add-site-btn">添加网站</button>
     </div>
 
-    <!-- 展示网站卡片的容器（ul或div都行，这里用ul） -->
+    <!-- 展示网站卡片的容器 -->
     <ul id="sites-container" class="sites-container"></ul>
   </div>
 
-  <!-- 引入 SortableJS CDN -->
+  <!-- 1. 引入 SortableJS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
+  <!-- 2. 主脚本逻辑 -->
   <script>
     // ======== 全局数据 ========
     let sites = JSON.parse(localStorage.getItem('mySites')) || [];
@@ -163,19 +166,19 @@
       sitesContainer.innerHTML = '';
 
       sites.forEach((site, index) => {
-        // 用 li 包裹卡片
+        // li 容器
         const li = document.createElement('li');
 
-        // 创建卡片
+        // 卡片
         const card = document.createElement('div');
         card.className = 'site-card';
 
-        // 如果索引在 selectedIndices 中，则加选中样式
+        // 若索引在 selectedIndices 中 => 选中样式
         if (selectedIndices.has(index)) {
           card.classList.add('selected');
         }
 
-        // 左上角选择圆圈
+        // 左上角圆圈
         const selectCircle = document.createElement('div');
         selectCircle.className = 'select-circle';
         const checkmark = document.createElement('div');
@@ -185,7 +188,7 @@
 
         // 点击圆圈 => 切换选中
         selectCircle.addEventListener('click', (e) => {
-          e.stopPropagation(); // 不要触发卡片的点击
+          e.stopPropagation(); // 不要触发卡片点击
           toggleSelection(index);
         });
 
@@ -193,17 +196,16 @@
         const img = document.createElement('img');
         img.src = site.faviconUrl || 'https://via.placeholder.com/48';
 
-        // 名称
+        // 网站名称
         const nameSpan = document.createElement('span');
         nameSpan.textContent = site.title || site.domain || '未命名';
 
-        // 点击卡片其他区域 => 在本页打开网站
+        // 点击卡片 => 在本页跳转到对应网站
         card.addEventListener('click', (e) => {
-          // 若点击的是selectCircle本身，跳过
           if (e.target === selectCircle || selectCircle.contains(e.target)) {
-            return;
+            return; // 点击到选择圆圈上，不跳转
           }
-          window.location.href = site.url; // 本页跳转
+          window.location.href = site.url;
         });
 
         // 组装
@@ -214,10 +216,41 @@
         sitesContainer.appendChild(li);
       });
 
+      // 更新“删除所选”按钮显示
       updateDeleteButtonVisibility();
     }
 
-    // ========== 2. 添加网站 ==========
+    // ========== 2. 初始化 / 更新 SortableJS ==========
+    let sortable = null;
+    function initSortable() {
+      // 如果已经有实例，先销毁
+      if (sortable) sortable.destroy();
+
+      // 创建 Sortable 实例
+      sortable = new Sortable(sitesContainer, {
+        animation: 150,         // 拖拽时动画
+        delay: 300,            // 移动端长按 300ms 开始拖拽
+        delayOnTouchOnly: true, 
+        onEnd: function (evt) {
+          // 拖拽结束 => 更新 sites 数组顺序
+          let oldIndex = evt.oldIndex;
+          let newIndex = evt.newIndex;
+          if (oldIndex !== newIndex) {
+            let movedItem = sites.splice(oldIndex, 1)[0];
+            sites.splice(newIndex, 0, movedItem);
+            // 保存
+            saveSites();
+            // 拖拽后清空选中
+            selectedIndices.clear();
+            // 重新渲染
+            renderSites();
+            initSortable();
+          }
+        }
+      });
+    }
+
+    // ========== 3. 添加网站 ==========
     addSiteBtn.addEventListener('click', async () => {
       let inputUrl = siteUrlInput.value.trim();
       if (!inputUrl) {
@@ -229,15 +262,14 @@
       sites.push(siteData);
       saveSites();
       renderSites();
-      siteUrlInput.value = '';
-      // 重新启动/更新 SortableJS
       initSortable();
+      siteUrlInput.value = '';
     });
 
-    // ========== 3. 批量删除选中 ==========
+    // ========== 4. 批量删除选中 ==========
     deleteSelectedBtn.addEventListener('click', () => {
       if (selectedIndices.size === 0) return;
-      // 从大到小删除，避免索引错位
+      // 从大到小删除
       const arr = Array.from(selectedIndices).sort((a,b)=>b-a);
       arr.forEach(idx => {
         sites.splice(idx, 1);
@@ -268,7 +300,7 @@
       }
     }
 
-    // ========== 保存到 localStorage ==========
+    // ========== 保存到 LocalStorage ==========
     function saveSites() {
       localStorage.setItem('mySites', JSON.stringify(sites));
     }
@@ -289,3 +321,18 @@
         };
       }
     }
+
+    // ========== 自动补全 http(s):// ==========
+    function normalizeUrl(url) {
+      if (!/^https?:\/\//i.test(url)) {
+        url = 'https://' + url;
+      }
+      return url;
+    }
+
+    // ========== 页面初始化 ==========
+    renderSites();
+    initSortable();
+  </script>
+</body>
+</html>
