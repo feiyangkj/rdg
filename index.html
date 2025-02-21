@@ -1,338 +1,56 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>RDG - 拖拽排序</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    header {
-      background: #333;
-      color: #fff;
-      padding: 1rem;
-      text-align: center;
-      position: relative;
-    }
-    header h1 {
-      margin: 0;
-    }
-    /* 批量删除按钮（右上角） */
-    #delete-selected-btn {
-      position: absolute;
-      right: 1rem;
-      top: 1rem;
-      padding: 0.5rem 1rem;
-      background-color: #f44336;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      display: none; /* 默认隐藏 */
-    }
-
-    .container {
-      padding: 1rem;
-      flex: 1;
-      overflow: auto;
-    }
-
-    /* 添加网站表单 */
-    .add-site-form {
-      margin-bottom: 1rem;
-    }
-    .add-site-form input {
-      width: 300px;
-      padding: 0.5rem;
-      margin-right: 0.5rem;
-    }
-    .add-site-form button {
-      padding: 0.5rem 1rem;
-      cursor: pointer;
-    }
-
-    /* 卡片容器（用ul更方便SortabledJS） */
-    .sites-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    /* 卡片样式 */
-    .site-card {
-      width: 120px;
-      height: 120px;
-      background-color: #f1f1f1;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      transition: box-shadow 0.2s;
-      position: relative;
-      cursor: pointer; /* SortableJS会处理拖拽 */
-    }
-    .site-card:hover {
-      box-shadow: 0 0 8px rgba(0,0,0,0.2);
-    }
-    .site-card img {
-      width: 48px;
-      height: 48px;
-      object-fit: contain;
-    }
-    .site-card span {
-      margin-top: 0.5rem;
-      font-size: 0.8rem;
-      color: #333;
-      word-break: break-all;
-    }
-
-    /* 选中高亮 */
-    .site-card.selected {
-      border: 2px solid #2196F3;
-      background-color: #e3f2fd;
-    }
-    /* 左上角选择圆圈：18x18 */
-    .select-circle {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background-color: rgba(0, 0, 0, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .checkmark {
-      color: #fff;
-      font-size: 14px;
-      display: none; /* 未选中时隐藏 */
-    }
-    .site-card.selected .select-circle {
-      background-color: #2196F3;
-    }
-    .site-card.selected .select-circle .checkmark {
-      display: block;
-    }
-  </style>
+  <meta charset="utf-8">
+  <title>RDG with Firebase</title>
 </head>
 <body>
-  <!-- 页头 -->
-  <header>
-    <h1>RDG - 拖拽排序</h1>
-    <button id="delete-selected-btn">删除所选</button>
-  </header>
+  <!-- 省略你的拖拽排序代码、页面结构等 -->
 
-  <div class="container">
-    <!-- 添加网站表单 -->
-    <div class="add-site-form">
-      <input type="text" id="site-url" placeholder="输入网址，如：google.com 或 https://www.google.com" />
-      <button id="add-site-btn">添加网站</button>
-    </div>
+  <!-- Firebase 脚本 -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js"></script>
 
-    <!-- 展示网站卡片的容器 -->
-    <ul id="sites-container" class="sites-container"></ul>
-  </div>
-
-  <!-- 1. 引入 SortableJS CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-
-  <!-- 2. 主脚本逻辑 -->
   <script>
-    // ======== 全局数据 ========
-    let sites = JSON.parse(localStorage.getItem('mySites')) || [];
-    let selectedIndices = new Set(); // 被选中的卡片索引
+    // ===== 你的原始逻辑 =====
+    let sites = [];
+    function renderSites() { /* ... */ }
+    function initSortable() { /* ... */ }
+    function addSite() { /* ... */ }
+    // ...
 
-    // DOM 引用
-    const sitesContainer = document.getElementById('sites-container');
-    const addSiteBtn = document.getElementById('add-site-btn');
-    const siteUrlInput = document.getElementById('site-url');
-    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    // ===== Firebase 初始化 =====
+    const firebaseConfig = {
+      apiKey: "xxx",
+      authDomain: "xxx.firebaseapp.com",
+      projectId: "xxx",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    // ========== 1. 渲染卡片 ==========
-    function renderSites() {
-      // 先清空
-      sitesContainer.innerHTML = '';
-
-      sites.forEach((site, index) => {
-        // li 容器
-        const li = document.createElement('li');
-
-        // 卡片
-        const card = document.createElement('div');
-        card.className = 'site-card';
-
-        // 若索引在 selectedIndices 中 => 选中样式
-        if (selectedIndices.has(index)) {
-          card.classList.add('selected');
+    // ===== 从云端加载数据 =====
+    async function loadDataFromCloud() {
+      const docRef = db.collection("rdg").doc("sitesData");
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        if (data.sites) {
+          sites = data.sites;
         }
-
-        // 左上角圆圈
-        const selectCircle = document.createElement('div');
-        selectCircle.className = 'select-circle';
-        const checkmark = document.createElement('div');
-        checkmark.className = 'checkmark';
-        checkmark.textContent = '✓';
-        selectCircle.appendChild(checkmark);
-
-        // 点击圆圈 => 切换选中
-        selectCircle.addEventListener('click', (e) => {
-          e.stopPropagation(); // 不要触发卡片点击
-          toggleSelection(index);
-        });
-
-        // LOGO
-        const img = document.createElement('img');
-        img.src = site.faviconUrl || 'https://via.placeholder.com/48';
-
-        // 网站名称
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = site.title || site.domain || '未命名';
-
-        // 点击卡片 => 在本页跳转到对应网站
-        card.addEventListener('click', (e) => {
-          if (e.target === selectCircle || selectCircle.contains(e.target)) {
-            return; // 点击到选择圆圈上，不跳转
-          }
-          window.location.href = site.url;
-        });
-
-        // 组装
-        card.appendChild(selectCircle);
-        card.appendChild(img);
-        card.appendChild(nameSpan);
-        li.appendChild(card);
-        sitesContainer.appendChild(li);
-      });
-
-      // 更新“删除所选”按钮显示
-      updateDeleteButtonVisibility();
-    }
-
-    // ========== 2. 初始化 / 更新 SortableJS ==========
-    let sortable = null;
-    function initSortable() {
-      // 如果已经有实例，先销毁
-      if (sortable) sortable.destroy();
-
-      // 创建 Sortable 实例
-      sortable = new Sortable(sitesContainer, {
-        animation: 150,         // 拖拽时动画
-        delay: 300,            // 移动端长按 300ms 开始拖拽
-        delayOnTouchOnly: true, 
-        onEnd: function (evt) {
-          // 拖拽结束 => 更新 sites 数组顺序
-          let oldIndex = evt.oldIndex;
-          let newIndex = evt.newIndex;
-          if (oldIndex !== newIndex) {
-            let movedItem = sites.splice(oldIndex, 1)[0];
-            sites.splice(newIndex, 0, movedItem);
-            // 保存
-            saveSites();
-            // 拖拽后清空选中
-            selectedIndices.clear();
-            // 重新渲染
-            renderSites();
-            initSortable();
-          }
-        }
-      });
-    }
-
-    // ========== 3. 添加网站 ==========
-    addSiteBtn.addEventListener('click', async () => {
-      let inputUrl = siteUrlInput.value.trim();
-      if (!inputUrl) {
-        alert('请输入网站地址！');
-        return;
       }
-      inputUrl = normalizeUrl(inputUrl);
-      const siteData = await fetchSiteData(inputUrl);
-      sites.push(siteData);
-      saveSites();
-      renderSites();
-      initSortable();
-      siteUrlInput.value = '';
-    });
-
-    // ========== 4. 批量删除选中 ==========
-    deleteSelectedBtn.addEventListener('click', () => {
-      if (selectedIndices.size === 0) return;
-      // 从大到小删除
-      const arr = Array.from(selectedIndices).sort((a,b)=>b-a);
-      arr.forEach(idx => {
-        sites.splice(idx, 1);
-      });
-      selectedIndices.clear();
-      saveSites();
-      renderSites();
-      initSortable();
-    });
-
-    // ========== 切换选中状态 ==========
-    function toggleSelection(index) {
-      if (selectedIndices.has(index)) {
-        selectedIndices.delete(index);
-      } else {
-        selectedIndices.add(index);
-      }
+      // 之后再渲染
       renderSites();
       initSortable();
     }
 
-    // ========== 显示/隐藏“删除所选”按钮 ==========
-    function updateDeleteButtonVisibility() {
-      if (selectedIndices.size > 0) {
-        deleteSelectedBtn.style.display = 'inline-block';
-      } else {
-        deleteSelectedBtn.style.display = 'none';
-      }
+    // ===== 保存到云端 =====
+    async function saveSites() {
+      await db.collection("rdg").doc("sitesData").set({ sites });
+      console.log("已保存到云端");
     }
 
-    // ========== 保存到 LocalStorage ==========
-    function saveSites() {
-      localStorage.setItem('mySites', JSON.stringify(sites));
-    }
-
-    // ========== 获取网站信息（favicon/title）==========
-    async function fetchSiteData(url) {
-      try {
-        const domain = new URL(url).hostname;
-        const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
-        return { url, domain, faviconUrl, title: domain };
-      } catch (e) {
-        // 如果URL不合法
-        return {
-          url,
-          domain: url,
-          faviconUrl: 'https://via.placeholder.com/48',
-          title: url
-        };
-      }
-    }
-
-    // ========== 自动补全 http(s):// ==========
-    function normalizeUrl(url) {
-      if (!/^https?:\/\//i.test(url)) {
-        url = 'https://' + url;
-      }
-      return url;
-    }
-
-    // ========== 页面初始化 ==========
-    renderSites();
-    initSortable();
+    // ===== 页面初始化 =====
+    loadDataFromCloud();
   </script>
 </body>
 </html>
