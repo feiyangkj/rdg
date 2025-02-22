@@ -2,151 +2,88 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>RDG with Firebase</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>风发导航</title>
   <style>
+    /* 基本重置 */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      margin: 0;
-      font-family: sans-serif;
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      font-family: "微软雅黑", Arial, sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
     }
-    header {
-      background: #333;
+    /* 头部 */
+    .header {
+      background: #4CAF50;
       color: #fff;
-      padding: 1rem;
+      padding: 20px;
       text-align: center;
-      position: relative;
     }
-    header h1 {
-      margin: 0;
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
     }
-    /* 批量删除按钮（右上角） */
-    #delete-selected-btn {
-      position: absolute;
-      right: 1rem;
-      top: 1rem;
-      padding: 0.5rem 1rem;
-      background-color: #f44336;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      display: none; /* 默认隐藏 */
-    }
-
-    .container {
-      padding: 1rem;
-      flex: 1;
+    /* 导航 */
+    .navbar {
+      background: #333;
       overflow: auto;
     }
-
-    /* 添加网站表单 */
-    .add-site-form {
-      margin-bottom: 1rem;
+    .navbar a {
+      float: left;
+      padding: 14px 20px;
+      color: #f2f2f2;
+      text-decoration: none;
+      font-size: 1rem;
     }
-    .add-site-form input {
-      width: 300px;
-      padding: 0.5rem;
-      margin-right: 0.5rem;
-    }
-    .add-site-form button {
-      padding: 0.5rem 1rem;
-      cursor: pointer;
-    }
-
-    /* 卡片容器（ul用于拖拽） */
-    .sites-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    /* 卡片样式 */
-    .site-card {
-      width: 120px;
-      height: 120px;
-      background-color: #f1f1f1;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      transition: box-shadow 0.2s;
-      position: relative;
-      cursor: pointer;
-    }
-    .site-card:hover {
-      box-shadow: 0 0 8px rgba(0,0,0,0.2);
-    }
-    .site-card img {
-      width: 48px;
-      height: 48px;
-      object-fit: contain;
-    }
-    .site-card span {
-      margin-top: 0.5rem;
-      font-size: 0.8rem;
+    .navbar a:hover {
+      background: #ddd;
       color: #333;
-      word-break: break-all;
+      transition: background 0.3s;
     }
-    /* 选中高亮 */
-    .site-card.selected {
-      border: 2px solid #2196F3;
-      background-color: #e3f2fd;
+    /* 主体内容 */
+    .container {
+      padding: 20px;
+      min-height: calc(100vh - 160px); /* 根据头部、导航和页脚的高度调整 */
     }
-    /* 左上角选择圆圈：18x18 */
-    .select-circle {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background-color: rgba(0, 0, 0, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    /* 页脚 */
+    .footer {
+      background: #333;
+      color: #f2f2f2;
+      text-align: center;
+      padding: 10px;
     }
-    .checkmark {
-      color: #fff;
-      font-size: 14px;
-      display: none; /* 未选中时隐藏 */
-    }
-    .site-card.selected .select-circle {
-      background-color: #2196F3;
-    }
-    .site-card.selected .select-circle .checkmark {
-      display: block;
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+      .navbar a {
+        float: none;
+        display: block;
+        text-align: center;
+      }
     }
   </style>
 </head>
 <body>
-  <!-- 页头 -->
-  <header>
-    <h1>RDG with Firebase</h1>
-    <button id="delete-selected-btn">删除所选</button>
+  <header class="header">
+    <h1>风发导航</h1>
+    <p>欢迎来到风发导航网站</p>
   </header>
-
-  <div class="container">
-    <!-- 添加网站表单 -->
-    <div class="add-site-form">
-      <input type="text" id="site-url" placeholder="输入网址，如：google.com 或 https://www.google.com" />
-      <button id="add-site-btn">添加网站</button>
-    </div>
-
-    <!-- 展示网站卡片的容器 -->
-    <ul id="sites-container" class="sites-container"></ul>
-  </div>
-
-  <!-- 1. 引入 SortableJS CDN（拖拽排序用） -->
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-
-  <!-- 2. Firebase 脚本（兼容版） -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase
+  
+  <nav class="navbar">
+    <a href="#home">首页</a>
+    <a href="#news">新闻</a>
+    <a href="#services">服务</a>
+    <a href="#contact">联系我们</a>
+    <a href="#about">关于我们</a>
+  </nav>
+  
+  <main class="container">
+    <h2>首页内容</h2>
+    <p>这里可以放置主要内容、新闻、链接或其他你想展示的信息。</p>
+  </main>
+  
+  <footer class="footer">
+    <p>版权所有 &copy; 2025 风发导航</p>
+  </footer>
+</body>
+</html>
